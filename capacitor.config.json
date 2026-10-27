@@ -1,0 +1,10 @@
+{
+  "appId": "com.libr.focusforge",
+  "appName": "FocusForge",
+  "webDir": "dist",
+  "backgroundColor": "#000000",
+  "plugins": {
+    "SystemBars": { "style": "DARK", "insetsHandling": "css" },
+    "LocalNotifications": { "iconColor": "#FF3045" }
+  }
+}

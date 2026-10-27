@@ -1,0 +1,63 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap add android
+      - run: node scripts/patch-android.mjs
+      - run: npx capacitor-assets generate --android --iconBackgroundColor '#050405' --iconBackgroundColorDark '#050405' --splashBackgroundColor '#000000' --splashBackgroundColorDark '#000000'
+      - run: npx cap sync android
+
+      - name: Build release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+
+      # With the KEYSTORE_* secrets: signed with your permanent key (updates install over old versions).
+      # Without them (forks, first try): signed with a throwaway key so the APK still installs.
+      - name: Sign APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
+            ALIAS="$KEY_ALIAS"; PASS="$KEYSTORE_PASSWORD"
+          else
+            echo "No keystore secrets found, using a temporary key."
+            PASS=temporary-pass; ALIAS=temp
+            keytool -genkeypair -keystore release.keystore -alias temp -keyalg RSA -keysize 2048 \
+              -validity 3650 -storepass "$PASS" -keypass "$PASS" -dname "CN=FocusForge temp"
+          fi
+          "$BT/zipalign" -p -f 4 "$UNSIGNED" aligned.apk
+          "$BT/apksigner" sign --ks release.keystore --ks-key-alias "$ALIAS" \
+            --ks-pass "pass:$PASS" --key-pass "pass:$PASS" --out FocusForge.apk aligned.apk
+          rm -f release.keystore
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FocusForge-apk
+          path: FocusForge.apk
+          retention-days: 30

@@ -1,0 +1,10 @@
+node_modules
+dist
+android
+*.log
+.DS_Store
+
+# keystore never goes in the repo
+signing/
+*.keystore
+*.jks
