@@ -15,6 +15,7 @@ const defaults = () => ({
   tasks: [],
   sessions: [],
   active: null,
+  emergencyExitUsage: { date: null, count: 0 },
 });
 
 function load() {
@@ -27,6 +28,7 @@ function load() {
       ...raw,
       profile: { ...d.profile, ...raw.profile },
       settings: { ...d.settings, ...raw.settings },
+      emergencyExitUsage: { ...d.emergencyExitUsage, ...raw.emergencyExitUsage },
     };
   } catch {
     return defaults();
@@ -55,6 +57,20 @@ const subscribe = (l) => {
 export const useStore = () => useSyncExternalStore(subscribe, () => state);
 export const useResult = () => useSyncExternalStore(subscribe, () => lastResult);
 export const getState = () => state;
+
+const localDateKey = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+export const EMERGENCY_EXITS_PER_DAY = 2;
+export const emergencyExitsRemaining = (now = new Date()) => {
+  const usage = state.emergencyExitUsage;
+  const used = usage?.date === localDateKey(now) ? usage.count : 0;
+  return Math.max(0, EMERGENCY_EXITS_PER_DAY - used);
+};
 
 export function setResult(r) {
   lastResult = r;
@@ -152,6 +168,14 @@ export const actions = {
         : state.tasks;
     commit({ ...state, active: null, tasks, sessions: [session, ...state.sessions] });
     return session;
+  },
+
+  emergencyExit: () => {
+    if (!state.active || emergencyExitsRemaining() <= 0) return null;
+    const date = localDateKey();
+    const count = state.emergencyExitUsage?.date === date ? state.emergencyExitUsage.count : 0;
+    commit({ ...state, emergencyExitUsage: { date, count: count + 1 } });
+    return actions.finish('cancelled');
   },
 
   deleteSession: (id) => commit({ ...state, sessions: state.sessions.filter((s) => s.id !== id) }),

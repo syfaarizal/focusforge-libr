@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lock, CheckSquare, Clock } from 'lucide-react';
 import { Modal } from '../components/ui';
-import { actions, remainingMs, useStore } from '../store';
+import { actions, emergencyExitsRemaining, remainingMs, useStore } from '../store';
 import { useNow } from '../hooks';
 import { fmtClock } from '../utils';
 import { isNative, isPinned } from '../native';
@@ -13,6 +13,7 @@ export default function Locked() {
   const now = useNow(true, 250);
   const [confirm, setConfirm] = useState(false);
   const [pinned, setPinned] = useState(true);
+  const exitsLeft = emergencyExitsRemaining();
 
   useEffect(() => {
     if (!isNative || !settings.pinEnabled) return undefined;
@@ -58,7 +59,11 @@ export default function Locked() {
         {isNative && settings.pinEnabled && !pinned && (
           <p className="pin-tip">Allow screen pinning when Android asks, so Home and Recents stay locked.</p>
         )}
-        <HoldButton label="Hold 5s for emergency exit" onDone={() => setConfirm(true)} />
+        <HoldButton
+          label={exitsLeft > 0 ? `Hold 5s for emergency exit (${exitsLeft} left today)` : 'Emergency exits used for today'}
+          disabled={exitsLeft === 0}
+          onDone={() => setConfirm(true)}
+        />
       </div>
 
       {confirm && (
@@ -66,7 +71,12 @@ export default function Locked() {
           <div className="alert-ring">!</div>
           <h2>Exit Focus Session?</h2>
           <p>You’re currently in a locked session. Are you sure you want to exit?</p>
-          <button className="btn primary" onClick={() => actions.finish('cancelled')}>
+          <button
+            className="btn primary"
+            onClick={() => {
+              if (actions.emergencyExit()) setConfirm(false);
+            }}
+          >
             Exit
           </button>
           <button className="btn ghost" onClick={() => setConfirm(false)}>
@@ -78,7 +88,7 @@ export default function Locked() {
   );
 }
 
-function HoldButton({ label, onDone }) {
+function HoldButton({ label, disabled = false, onDone }) {
   const [p, setP] = useState(0);
   const raf = useRef(0);
   const t0 = useRef(0);
@@ -106,7 +116,8 @@ function HoldButton({ label, onDone }) {
   return (
     <button
       className="hold-btn"
-      onPointerDown={start}
+      disabled={disabled}
+      onPointerDown={disabled ? undefined : start}
       onPointerUp={stop}
       onPointerLeave={stop}
       onPointerCancel={stop}
