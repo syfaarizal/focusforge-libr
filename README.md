@@ -5,7 +5,7 @@
 A personal focus app for Android: pick a task, set a duration, and lock yourself into the session until the timer ends.
 Built with React and wrapped as a native app with Capacitor. Everything is stored on the device, with no backend and no account.
 
-**[Live demo](#)** (web version; native features like screen pinning only work in the APK)
+**[Live demo](https://focusforge-libr.vercel.app/)** (web version; native features like screen pinning only work in the APK)
 
 <p>
   <img src="docs/home.png" width="19%" alt="Dashboard" />
