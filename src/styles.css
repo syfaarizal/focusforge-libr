@@ -51,7 +51,7 @@ h1, h2, h3, p { margin: 0; }
 .section-note { margin: -4px 0 10px; font-size: 12px; color: var(--dim); }
 
 /* cards */
-.card { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+.card { background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin: 12px 0; }
 .row-card { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
 .group { padding: 4px 16px; }
 .set-row { display: flex; align-items: center; gap: 14px; width: 100%; padding: 13px 0; border-bottom: 1px solid var(--line2); color: #fff; }
@@ -116,6 +116,7 @@ h1, h2, h3, p { margin: 0; }
 .tile-badge { position: absolute; right: 14px; bottom: 14px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line2); color: var(--muted); }
 .tile-badge svg.lucide-play { margin-bottom: 0; }
 .tile-badge.solid { background: var(--grad); color: #fff; border: 0; }
+.tile-badge svg.lucide-list-checks { margin-bottom: 0; margin-right: 1px; }
 .quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .quick button { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: #d8d8da; }
 .quick span { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--card2); border: 1px solid var(--line); color: var(--red); }
