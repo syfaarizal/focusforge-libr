@@ -3,7 +3,7 @@ import { Clock, Pause, Play, Minus, Plus, Check, Lock } from 'lucide-react';
 import { Header, Ring, Switch, Modal } from '../components/ui';
 import { actions, remainingMs, setResult, useStore } from '../store';
 import { useNow } from '../hooks';
-import { fmtClock, fmtHM } from '../utils';
+import { fmtClock, fmtHM, todayKey } from '../utils';
 
 export default function WorkTime({ back, push, params }) {
   const { tasks, settings, active } = useStore();
@@ -12,7 +12,8 @@ export default function WorkTime({ back, push, params }) {
 }
 
 function Setup({ back, push, params, tasks, settings }) {
-  const pending = tasks.filter((t) => !t.done);
+  const todayK = todayKey();
+  const pending = tasks.filter((t) => !t.done && (!t.scheduledFor || t.scheduledFor <= todayK));
   const initial = pending.find((t) => t.id === params?.taskId) || pending[0];
   const [taskId, setTaskId] = useState(initial?.id || null);
   const [mins, setMins] = useState(initial?.targetMin || settings.defaultDurationMin);

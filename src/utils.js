@@ -31,6 +31,31 @@ export const dateKey = (ts) => {
   const d = new Date(ts);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+export const todayKey = () => dateKey(Date.now());
+
+/** "YYYY-MM-DD" -> local midnight timestamp. */
+export const keyToTs = (key) => {
+  const [y, m, d] = String(key).split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
+};
+
+/** Whole days from aKey to bKey (bKey - aKey). Negative if bKey is earlier. */
+export const daysBetween = (aKey, bKey) => Math.round((keyToTs(bKey) - keyToTs(aKey)) / 86400000);
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+export const fmtDayKey = (key) => {
+  const [, m, d] = String(key).split('-').map(Number);
+  return `${MONTHS[m - 1]} ${d}`;
+};
+
+/** "Today" / "Tomorrow" / "Yesterday" / "Oct 30" for a YYYY-MM-DD key. */
+export const relDay = (key) => {
+  const d = daysBetween(todayKey(), key);
+  if (d === 0) return 'Today';
+  if (d === 1) return 'Tomorrow';
+  if (d === -1) return 'Yesterday';
+  return fmtDayKey(key);
+};
 export const fmtDateTime = (ts) => {
   const d = new Date(ts);
   return `${dateKey(ts)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;

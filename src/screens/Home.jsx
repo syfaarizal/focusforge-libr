@@ -2,14 +2,17 @@ import { Settings as Gear, Flame, Clock, ListChecks, ChartColumn, History as His
 import avatar from '../assets/avatar.png';
 import { useStore, remainingMs } from '../store';
 import { useNow } from '../hooks';
-import { fmtClock, fmtHM, greeting, startOfDay, sumMs } from '../utils';
+import { fmtClock, fmtHM, greeting, startOfDay, sumMs, todayKey } from '../utils';
 
 export default function Home({ push, go }) {
   const { profile, tasks, sessions, settings, active } = useStore();
   const now = useNow(!!active, 500);
   const today = startOfDay(now);
   const focusMs = sumMs(sessions.filter((s) => s.startedAt >= today));
-  const todayTasks = tasks.filter((t) => !t.done || (t.doneAt && t.doneAt >= today));
+  const todayK = todayKey();
+  const todayTasks = tasks.filter(
+    (t) => (t.scheduledFor ? t.scheduledFor <= todayK : true) && (!t.done || (t.doneAt && t.doneAt >= today)),
+  );
   const done = todayTasks.filter((t) => t.done).length;
   const goalMs = settings.dailyGoalMin * 60000;
 

@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, CalendarDays } from 'lucide-react';
 import { Header } from '../components/ui';
 import { actions } from '../store';
-import { CATEGORIES, parseDuration } from '../utils';
+import { CATEGORIES, parseDuration, todayKey } from '../utils';
 
 export default function AddTask({ back }) {
   const [name, setName] = useState('');
   const [cat, setCat] = useState('Work');
   const [time, setTime] = useState('');
   const [notes, setNotes] = useState('');
+  const [date, setDate] = useState(todayKey());
   const [err, setErr] = useState('');
 
   const save = () => {
@@ -16,7 +17,7 @@ export default function AddTask({ back }) {
     const mins = parseDuration(time);
     if (Number.isNaN(mins) || (mins !== null && (mins < 1 || mins > 720)))
       return setErr('Use a time like 90m, 1h30 or 2 hours (max 12h).');
-    actions.addTask({ name, category: cat, targetMin: mins, notes });
+    actions.addTask({ name, category: cat, targetMin: mins, notes, scheduledFor: date });
     back();
   };
 
@@ -34,6 +35,12 @@ export default function AddTask({ back }) {
               {c}
             </button>
           ))}
+        </div>
+
+        <label>Scheduled for</label>
+        <div className="input with-icon">
+          <CalendarDays size={18} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value || todayKey())} />
         </div>
 
         <label>Time (optional)</label>

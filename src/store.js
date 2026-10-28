@@ -18,6 +18,14 @@ const defaults = () => ({
   emergencyExitUsage: { date: null, count: 0 },
 });
 
+const localDateKey = (ts = Date.now()) => {
+  const date = new Date(ts);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function load() {
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -29,6 +37,8 @@ function load() {
       profile: { ...d.profile, ...raw.profile },
       settings: { ...d.settings, ...raw.settings },
       emergencyExitUsage: { ...d.emergencyExitUsage, ...raw.emergencyExitUsage },
+      // tasks saved before scheduling existed: back-date them to their creation day
+      tasks: (raw.tasks || []).map((t) => (t.scheduledFor ? t : { ...t, scheduledFor: localDateKey(t.createdAt) })),
     };
   } catch {
     return defaults();
@@ -58,13 +68,6 @@ export const useStore = () => useSyncExternalStore(subscribe, () => state);
 export const useResult = () => useSyncExternalStore(subscribe, () => lastResult);
 export const getState = () => state;
 
-const localDateKey = (date = new Date()) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export const EMERGENCY_EXITS_PER_DAY = 2;
 export const emergencyExitsRemaining = (now = new Date()) => {
   const usage = state.emergencyExitUsage;
@@ -88,7 +91,7 @@ export const actions = {
   setName: (name) => commit({ ...state, profile: { ...state.profile, name: name.trim() || 'Kai Shi' } }),
   updateSettings: (patch) => commit({ ...state, settings: { ...state.settings, ...patch } }),
 
-  addTask: ({ name, category, targetMin, notes }) => {
+  addTask: ({ name, category, targetMin, notes, scheduledFor }) => {
     const task = {
       id: uid(),
       name: name.trim(),
@@ -98,6 +101,7 @@ export const actions = {
       done: false,
       createdAt: Date.now(),
       doneAt: null,
+      scheduledFor: scheduledFor || localDateKey(),
     };
     commit({ ...state, tasks: [task, ...state.tasks] });
     return task;
@@ -110,6 +114,13 @@ export const actions = {
       ),
     }),
   deleteTask: (id) => commit({ ...state, tasks: state.tasks.filter((t) => t.id !== id) }),
+
+  /** Move an overdue task to today. */
+  pullToToday: (id) =>
+    commit({
+      ...state,
+      tasks: state.tasks.map((t) => (t.id === id ? { ...t, scheduledFor: localDateKey() } : t)),
+    }),
 
   startSession: ({ taskId, durationMin, locked }) => {
     const task = state.tasks.find((t) => t.id === taskId);
