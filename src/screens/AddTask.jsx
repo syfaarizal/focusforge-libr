@@ -26,7 +26,7 @@ export default function AddTask({ back }) {
       <Header title="Add Task" onBack={back} />
       <div className="scroll form">
         <label>Task Name</label>
-        <input className="input" placeholder="e.g. Belajar React" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+        <input className="input" placeholder="e.g. Learning React" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
 
         <label>Category</label>
         <div className="cat-grid">
