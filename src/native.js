@@ -3,9 +3,15 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import ringtoneUrl from './assets/sfx/ringtone-boom.mp3';
 
 export const isNative = Capacitor.isNativePlatform();
 
+/**
+ * Name of the sound file in Android's res/raw. Must match the file copied by
+ * scripts/patch-android.mjs (Android resource names cannot contain dashes).
+ */
+export const RINGTONE_NAME = 'ringtone_boom.mp3';
 // Custom plugin (see android-plugin/ScreenPinPlugin.java): screen pinning + keep-screen-on
 const ScreenPin = registerPlugin('ScreenPin');
 
@@ -24,6 +30,13 @@ export const keepAwake = (on) => (isNative ? safe(() => ScreenPin.keepAwake({ on
 
 const NOTIF_ID = 1001;
 
+/**
+ * True while a scheduled end-of-session notification is pending. The OS plays
+ * that notification's sound, so the in-app ringtone must stay silent or the
+ * two overlap into a double ring.
+ */
+let endNotifScheduled = false;
+
 export async function ensureNotifPermission() {
   if (!isNative) return false;
   return safe(async () => {
@@ -36,6 +49,7 @@ export async function ensureNotifPermission() {
 
 export async function scheduleEnd(atMs, taskName) {
   if (!isNative) return;
+  endNotifScheduled = false;
   await safe(async () => {
     if (!(await ensureNotifPermission())) return;
     await LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID }] });
@@ -45,22 +59,55 @@ export async function scheduleEnd(atMs, taskName) {
           id: NOTIF_ID,
           title: 'Focus session complete',
           body: `${taskName} — nice work.`,
+          sound: RINGTONE_NAME,
           schedule: { at: new Date(atMs), allowWhileIdle: true },
         },
       ],
     });
+    endNotifScheduled = true;
   });
 }
 
-export const cancelEnd = () =>
-  isNative ? safe(() => LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID }] })) : undefined;
+export const cancelEnd = () => {
+  endNotifScheduled = false;
+  return isNative ? safe(() => LocalNotifications.cancel({ notifications: [{ id: NOTIF_ID }] })) : undefined;
+};
 
 export async function buzz() {
   if (isNative) await safe(() => Haptics.impact({ style: ImpactStyle.Heavy }));
   else if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
+let ringtone = null;
+
+/** Lazily create the ringtone <audio> element so the file is buffered before it is needed. */
+function ringtoneEl() {
+  if (ringtone) return ringtone;
+  ringtone = new Audio(ringtoneUrl);
+  ringtone.preload = 'auto';
+  ringtone.volume = 1;
+  ringtone.load();
+  return ringtone;
+}
+
+/**
+ * Play the end-of-session ringtone. Falls back to a beep if the file cannot
+ * play. Silent when a native notification is about to ring for the same event.
+ */
 export function beep() {
+  if (endNotifScheduled) return;
+  try {
+    const el = ringtoneEl();
+    el.currentTime = 0;
+    const p = el.play();
+    if (p?.catch) p.catch(() => fallbackBeep());
+  } catch {
+    fallbackBeep();
+  }
+}
+
+/** Synth chime, used only when the ringtone file is unavailable. */
+function fallbackBeep() {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     const ctx = new Ctx();

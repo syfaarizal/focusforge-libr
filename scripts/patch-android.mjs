@@ -7,6 +7,8 @@ const APP = 'android/app';
 const PKG_DIR = path.join(APP, 'src/main/java/com/libr/focusforge');
 const MANIFEST = path.join(APP, 'src/main/AndroidManifest.xml');
 const GRADLE = path.join(APP, 'build.gradle');
+const RAW = path.join(APP, 'src/main/res/raw');
+const SFX = path.join('src', 'assets', 'sfx');
 
 function must(cond, msg) {
   if (!cond) {
@@ -53,5 +55,21 @@ const code = parseInt(process.env.GITHUB_RUN_NUMBER || '1', 10);
 must(/versionCode\s+\d+/.test(g), 'versionCode not found in app/build.gradle');
 g = g.replace(/versionCode\s+\d+/, `versionCode ${code}`).replace(/versionName\s+"[^"]*"/, 'versionName "1.0.0"');
 fs.writeFileSync(GRADLE, g);
+
+// 4) end-of-session ringtone into res/raw so the notification can play it.
+//    Android resource names must be lowercase alphanumerics + underscore, so
+//    ringtone-boom.mp3 becomes res/raw/ringtone_boom.mp3 (the extension must be
+//    preserved - Android matches the resource by name without it, but the file
+//    itself keeps its extension). Keep in sync with RINGTONE_NAME in src/native.js.
+if (fs.existsSync(SFX)) {
+  fs.mkdirSync(RAW, { recursive: true });
+  for (const f of fs.readdirSync(SFX).filter((f) => f.endsWith('.mp3'))) {
+    const ext = path.extname(f);
+    const base = path.basename(f, ext).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+    const resName = base + ext;
+    fs.copyFileSync(path.join(SFX, f), path.join(RAW, resName));
+    console.log('patch-android: sound ' + f + ' -> res/raw/' + resName);
+  }
+}
 
 console.log('patch-android: done (versionCode ' + code + ')');
