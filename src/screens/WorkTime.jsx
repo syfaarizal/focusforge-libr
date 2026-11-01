@@ -8,7 +8,65 @@ import { fmtClock, fmtHM, todayKey } from '../utils';
 export default function WorkTime({ back, push, params }) {
   const { tasks, settings, active } = useStore();
   if (active) return <ActiveView back={back} />;
+  if (params?.habit) return <HabitSetup back={back} params={params} settings={settings} />;
   return <Setup back={back} push={push} params={params} tasks={tasks} settings={settings} />;
+}
+
+// A focus session for a habit: no task behind it, it only fills the window.
+function HabitSetup({ back, params, settings }) {
+  const habit = params.habit;
+  const [mins, setMins] = useState(habit.minMinutes || 90);
+  const step = (d) => setMins((m) => Math.min(480, Math.max(5, m + d)));
+
+  return (
+    <>
+      <Header title={habit.name} onBack={back} />
+      <div className="scroll">
+        <div className="center">
+          <Ring size={190} stroke={12} progress={1}>
+            <Clock size={22} className="red" />
+            <div className="ring-time sm">{fmtClock(mins * 60000)}</div>
+            <small>duration</small>
+          </Ring>
+        </div>
+
+        <div className="stepper-row">
+          <button className="icon-btn round" onClick={() => step(-5)} aria-label="Minus 5 minutes">
+            <Minus size={18} />
+          </button>
+          <span>{fmtHM(mins * 60000)}</span>
+          <button className="icon-btn round" onClick={() => step(5)} aria-label="Plus 5 minutes">
+            <Plus size={18} />
+          </button>
+        </div>
+        <div className="chips-row">
+          {[25, 45, 60, 90, 120].map((m) => (
+            <button key={m} className={`chip ${mins === m ? 'active' : ''}`} onClick={() => setMins(m)}>
+              {m}m
+            </button>
+          ))}
+        </div>
+
+        <div className="card row-card">
+          <Lock size={20} className="red" />
+          <div className="grow">
+            <b>Focus Lock</b>
+            <span>Lock the screen until the timer ends</span>
+          </div>
+          <Switch on={settings.lockEnabled} onChange={(v) => actions.updateSettings({ lockEnabled: v })} />
+        </div>
+        <div style={{ height: 96 }} />
+      </div>
+      <div className="bottom-action">
+        <button
+          className="btn primary"
+          onClick={() => actions.startHabitSession({ name: habit.name, durationMin: mins, locked: settings.lockEnabled })}
+        >
+          <Play size={18} fill="currentColor" /> Start Focus
+        </button>
+      </div>
+    </>
+  );
 }
 
 function Setup({ back, push, params, tasks, settings }) {

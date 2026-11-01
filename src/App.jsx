@@ -15,6 +15,8 @@ import Tracker from './screens/Tracker';
 import History from './screens/History';
 import Stats from './screens/Stats';
 import Settings from './screens/Settings';
+import Habits from './screens/Habits';
+import HabitEdit from './screens/HabitEdit';
 
 const TABS = ['home', 'tracker', 'history', 'settings'];
 
@@ -105,6 +107,8 @@ export default function App() {
     history: History,
     stats: Stats,
     settings: Settings,
+    habits: Habits,
+    habitEdit: HabitEdit,
   };
   const Screen = screens[route.name] || Home;
 

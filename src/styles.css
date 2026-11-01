@@ -225,6 +225,58 @@ input[type='date'] { color-scheme: dark; }
 .cat-stat small { color: var(--muted); font-size: 11.5px; }
 .cat-stat em { font-style: normal; font-size: 11.5px; color: var(--dim); }
 
+/* habits */
+.streak-card { width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, #2a0c12, #12060a 70%); border: 1px solid var(--line); margin-bottom: 14px; text-align: left; }
+.streak-card .streak-flame { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; flex: none; background: rgba(255, 48, 69, 0.14); color: var(--red); }
+.streak-card.broken .streak-flame { color: var(--muted); }
+.streak-num { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.streak-card .grow > span { color: var(--muted); font-size: 12.5px; }
+
+.h-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.h-chip.ok { background: rgba(52, 211, 153, 0.14); color: #34d399; }
+.h-chip.bad { background: rgba(255, 48, 69, 0.16); color: #ff7686; }
+.h-chip.live { background: rgba(255, 48, 69, 0.14); color: #ff8f9b; }
+.h-chip.dim { background: rgba(255, 255, 255, 0.07); color: var(--muted); }
+
+.h-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 13px 14px; margin-bottom: 8px; border-radius: 14px; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--line2); }
+.h-row.done { border-color: rgba(52, 211, 153, 0.24); }
+.h-row.missed { border-color: rgba(255, 48, 69, 0.32); }
+.h-icon { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; flex: none; background: var(--card); border: 1px solid var(--line2); color: var(--muted); }
+.h-icon.done { color: #34d399; border-color: rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.1); }
+.h-icon.open { color: var(--red); border-color: var(--line); }
+.h-icon.missed { color: #ff7686; }
+.h-opt { margin-left: 7px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); background: rgba(255, 255, 255, 0.06); padding: 2px 6px; border-radius: 6px; vertical-align: middle; }
+.h-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex: none; }
+.h-btn { width: auto; height: 32px; padding: 0 14px; border-radius: 10px; font-size: 12.5px; }
+.h-link { font-size: 12px; }
+.h-timer { font-size: 11.5px; color: var(--red); font-variant-numeric: tabular-nums; }
+.h-progress { margin-top: 7px; width: 100%; }
+.h-progress-label { font-size: 11px; color: var(--dim); margin-top: 3px; display: block; }
+
+.week-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; border-radius: 12px; background: var(--card); border: 1px solid var(--line2); }
+.week-day span { font-size: 10.5px; color: var(--muted); }
+.week-day i { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.14); }
+.week-day.complete i { background: #34d399; }
+.week-day.broken i { background: var(--red); }
+.week-day.rest i { background: #7c8cff; }
+.week-day.pending i { background: #f5a524; }
+
+.rest-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.rest-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 9px 0; border-radius: 12px; background: var(--card); border: 1px solid var(--line2); color: var(--text); }
+.rest-cell b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rest-cell span { font-size: 10px; color: var(--muted); }
+.rest-cell.on { background: rgba(124, 140, 255, 0.16); border-color: rgba(124, 140, 255, 0.45); }
+.rest-cell.on b { color: #a8b4ff; }
+
+.habit-edit { padding: 14px 16px; }
+.habit-edit-head { display: flex; align-items: center; gap: 8px; }
+.habit-edit-head .input { font-weight: 600; }
+.habit-edit .chips-row { justify-content: flex-start; margin: 12px 0 4px; }
+.habit-edit .date-row label { margin: 12px 0 0; }
+.habit-edit input[type='time'], .habit-edit input[type='number'] { color-scheme: dark; }
+.habit-edit .set-row { margin-top: 8px; }
+
 /* loading */
 .loading { position: fixed; inset: 0; z-index: 100; background: #050303; display: flex; align-items: center; justify-content: center; padding: 24px; transition: opacity 0.5s ease; }
 .loading.out { opacity: 0; pointer-events: none; }

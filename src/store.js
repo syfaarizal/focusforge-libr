@@ -1,7 +1,28 @@
 import { useSyncExternalStore } from 'react';
 import { uid } from './utils';
+import {
+  DEFAULT_HABIT_VERSIONS,
+  checkInTap,
+  dateKey as habitDateKey,
+  finishTimerHabit,
+  scheduleHabitEdit,
+  scheduleRest,
+  setExcused,
+  startTimerHabit,
+} from './lib/habits';
 
 const KEY = 'focusforge.v1';
+
+/** Habits start today with the default plan; edits only ever apply from tomorrow. */
+const habitDefaults = () => {
+  const today = habitDateKey(Date.now());
+  return {
+    habitVersions: [{ from: today, habits: DEFAULT_HABIT_VERSIONS[0].habits.map((h) => ({ ...h })) }],
+    logs: {},
+    restDays: [],
+    startDate: today,
+  };
+};
 
 const defaults = () => ({
   profile: { name: 'Kai Shi' },
@@ -16,6 +37,7 @@ const defaults = () => ({
   sessions: [],
   active: null,
   emergencyExitUsage: { date: null, count: 0 },
+  habits: habitDefaults(),
 });
 
 const localDateKey = (ts = Date.now()) => {
@@ -37,6 +59,7 @@ function load() {
       profile: { ...d.profile, ...raw.profile },
       settings: { ...d.settings, ...raw.settings },
       emergencyExitUsage: { ...d.emergencyExitUsage, ...raw.emergencyExitUsage },
+      habits: { ...d.habits, ...(raw.habits || {}) },
       // tasks saved before scheduling existed: back-date them to their creation day
       tasks: (raw.tasks || []).map((t) => (t.scheduledFor ? t : { ...t, scheduledFor: localDateKey(t.createdAt) })),
     };
@@ -193,4 +216,81 @@ export const actions = {
   restoreSession: (s) =>
     commit({ ...state, sessions: [...state.sessions, s].sort((a, b) => b.startedAt - a.startedAt) }),
   clearSessions: () => commit({ ...state, sessions: [] }),
+
+  /**
+   * A focus session for a habit: no task behind it, it only exists to fill
+   * the habit's window. Sessions still count toward the focus habit.
+   */
+  startHabitSession: ({ name, durationMin, locked }) => {
+    if (state.active) return null;
+    const session = {
+      id: uid(),
+      taskId: null,
+      taskName: name,
+      category: 'Work',
+      notes: '',
+      plannedMs: durationMin * 60000,
+      startedAt: Date.now(),
+      pausedAt: null,
+      pausedTotal: 0,
+      locked: !!locked,
+    };
+    commit({ ...state, active: session });
+    return session;
+  },
+
+  /* ---------- habits ---------- */
+  habitCheckInTap: (habit) => {
+    const r = checkInTap(state.habits.logs, habit, Date.now());
+    if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
+    return r;
+  },
+  habitStartTimer: (habit) => {
+    const r = startTimerHabit(state.habits.logs, habit, Date.now());
+    if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
+    return r;
+  },
+  habitFinishTimer: (habit) => {
+    const r = finishTimerHabit(state.habits.logs, habit, Date.now());
+    if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
+    return r;
+  },
+  habitSetExcused: (habit, value) => {
+    const r = setExcused(state.habits.logs, habit, Date.now(), value);
+    if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
+    return r;
+  },
+  habitScheduleRest: (targetKey) => {
+    const r = scheduleRest(state.habits.restDays, targetKey, Date.now());
+    if (r.ok) commit({ ...state, habits: { ...state.habits, restDays: r.restDays } });
+    return r;
+  },
+  habitCancelRest: (targetKey) =>
+    commit({
+      ...state,
+      habits: { ...state.habits, restDays: state.habits.restDays.filter((k) => k !== targetKey) },
+    }),
+  habitSaveVersions: (habits) =>
+    commit({
+      ...state,
+      habits: {
+        ...state.habits,
+        habitVersions: scheduleHabitEdit(state.habits.habitVersions, habits, Date.now()),
+      },
+    }),
+  habitResetLogs: () =>
+    commit({ ...state, habits: { ...state.habits, logs: {} } }),
 };
+
+/**
+ * Context for the pure habit logic. Session completion is judged by this app's
+ * own status names, which differ from the library's default.
+ */
+export const habitContext = (s = state) => ({
+  habitVersions: s.habits.habitVersions,
+  logs: s.habits.logs,
+  sessions: s.sessions,
+  restDays: s.habits.restDays,
+  startDate: s.habits.startDate,
+  isCompleted: (sess) => sess.status === 'completed' && !!sess.endedAt,
+});

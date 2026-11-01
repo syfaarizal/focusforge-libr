@@ -1,8 +1,9 @@
-import { Settings as Gear, Flame, Clock, ListChecks, ChartColumn, History as HistoryIcon, Play, ChevronRight, Plus, Timer } from 'lucide-react';
+import { Settings as Gear, Flame, Clock, ListChecks, ChartColumn, History as HistoryIcon, Play, ChevronRight, Plus, Timer, Repeat } from 'lucide-react';
 import avatar from '../assets/avatar.png';
-import { useStore, remainingMs } from '../store';
+import { useStore, remainingMs, habitContext } from '../store';
 import { useNow } from '../hooks';
 import { fmtClock, fmtHM, greeting, startOfDay, sumMs, todayKey } from '../utils';
+import { computeStreak, dateKey, habitsFor, resolveDay } from '../lib/habits';
 
 export default function Home({ push, go }) {
   const { profile, tasks, sessions, settings, active } = useStore();
@@ -15,6 +16,12 @@ export default function Home({ push, go }) {
   );
   const done = todayTasks.filter((t) => t.done).length;
   const goalMs = settings.dailyGoalMin * 60000;
+
+  const hCtx = habitContext();
+  const hKey = dateKey(now);
+  const hHabits = habitsFor(hCtx.habitVersions, hKey);
+  const hStreak = computeStreak(now, hCtx);
+  const hState = resolveDay(hKey, now, hCtx);
 
   return (
     <div className="scroll">
@@ -49,6 +56,21 @@ export default function Home({ push, go }) {
         </div>
         <ChevronRight size={18} />
       </button>
+
+      {hHabits.length > 0 && (
+        <button className={`streak-card ${hState}`} onClick={() => push('habits')}>
+          <span className="streak-flame">
+            <Repeat size={22} />
+          </span>
+          <div className="focus-card-text">
+            <b>Habit Streak</b>
+            <span>
+              {hStreak.current} day{hStreak.current === 1 ? '' : 's'} · {hState === 'complete' ? 'day complete' : hState === 'broken' ? 'streak broken' : 'in progress'}
+            </span>
+          </div>
+          <ChevronRight size={18} />
+        </button>
+      )}
 
       <div className="grid2">
         <button className="tile" onClick={() => push('work')}>
