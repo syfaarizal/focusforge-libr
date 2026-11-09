@@ -1,10 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { Check } from 'lucide-react';
-import { actions, endAt, getState, remainingMs, setResult, useResult, useStore } from './store';
+import { actions, endAt, getState, habitContext, remainingMs, setResult, useResult, useStore } from './store';
 import { BottomNav, Modal } from './components/ui';
-import { beep, buzz, cancelEnd, isNative, keepAwake, pinStart, pinStop, scheduleEnd } from './native';
+import {
+  beep,
+  buzz,
+  cancelEnd,
+  cancelHabitTimerEnd,
+  clearHabitReminders,
+  closeHabitTimerEnd,
+  endNotifRings,
+  habitTimerEndScheduledIds,
+  isNative,
+  keepAwake,
+  notifyHabitDone,
+  pinStart,
+  pinStop,
+  scheduleEnd,
+  scheduleHabitTimerEnd,
+  syncHabitReminders,
+} from './native';
 import { fmtHM } from './utils';
+import { useTodayKey } from './hooks';
+import { dateKey, habitsFor, habitStatus, reminderTimes, runningHabitTimers } from './lib/habits';
 import Loading from './screens/Loading';
 import Home from './screens/Home';
 import Tasks from './screens/Tasks';
@@ -21,7 +40,9 @@ import HabitEdit from './screens/HabitEdit';
 const TABS = ['home', 'tracker', 'history', 'settings'];
 
 export default function App() {
-  const { active, settings } = useStore();
+  const store = useStore();
+  const { active, settings } = store;
+  const todayKey = useTodayKey();
   const result = useResult();
   const [booting, setBooting] = useState(true);
   const [stack, setStack] = useState([{ name: 'home' }]);
@@ -42,7 +63,9 @@ export default function App() {
         const s = actions.finish('completed', true);
         setResult(s);
         buzz();
-        beep();
+        // An exactly scheduled alert rings on its own at this moment, so the
+        // app only plays the sound when there is no such alert.
+        if (!endNotifRings()) beep();
       }
     };
     check();
@@ -71,6 +94,77 @@ export default function App() {
     if (end && settings.notifications) scheduleEnd(end, active.taskName);
     else cancelEnd();
   }, [end, settings.notifications]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---- habits: advance running timers, notify on completion ---- */
+  const notifiedFocus = useRef(new Set());
+  useEffect(() => {
+    const check = async () => {
+      const done = actions.habitTick();
+      for (const habit of done) {
+        // An exactly scheduled alert already announced this completion and
+        // already rang, so neither the sound nor the notification is repeated.
+        const announced = await closeHabitTimerEnd(habit.id);
+        buzz();
+        if (!announced) {
+          beep();
+          if (settings.notifications) notifyHabitDone(habit);
+        }
+      }
+
+      // A focus habit (Study / Work) is complete once enough focus time was
+      // logged inside its window. That has no timer of its own, so the moment
+      // it flips to done is noticed here.
+      const key = dateKey(Date.now());
+      const ctx = habitContext();
+      for (const habit of habitsFor(ctx.habitVersions, key)) {
+        if (habit.kind !== 'focus') continue;
+        const id = `${key}:${habit.id}`;
+        const doneNow = habitStatus(habit, key, Date.now(), ctx) === 'done';
+        if (doneNow && !notifiedFocus.current.has(id)) {
+          notifiedFocus.current.add(id);
+          buzz();
+          if (settings.notifications) notifyHabitDone(habit);
+        } else if (!doneNow) {
+          notifiedFocus.current.delete(id);
+        }
+      }
+    };
+    check();
+    const t = setInterval(check, 1000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [settings.notifications]);
+
+  /* ---- habits: schedule a reminder for every window that is still ahead ---- */
+  const habitVersions = store.habits.habitVersions;
+  const habitVersionsKey = habitVersions.map((v) => `${v.from}:${v.habits.map((h) => `${h.id}:${h.open}`).join(',')}`).join('|');
+  useEffect(() => {
+    if (!settings.notifications) {
+      clearHabitReminders();
+      return;
+    }
+    const now = Date.now();
+    const key = dateKey(now);
+    const reminders = reminderTimes(habitsFor(habitVersions, key), key, now);
+    syncHabitReminders(reminders);
+  }, [habitVersionsKey, settings.notifications, todayKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---- habits: alert when a running timer runs out, even if the app is not ---- */
+  const runningTimers = runningHabitTimers(store.habits.logs, habitVersions, dateKey(Date.now()));
+  const runningTimersKey = runningTimers.map((t) => `${t.habit.id}:${t.at}`).join('|');
+  useEffect(() => {
+    const wanted = new Set(runningTimers.map((t) => t.habit.id));
+    // A timer that is no longer running must not leave its alert behind, and
+    // neither may an alert survive the notifications being switched off.
+    [...habitTimerEndScheduledIds()].forEach((id) => {
+      if (!wanted.has(id) || !settings.notifications) cancelHabitTimerEnd(id);
+    });
+    if (!settings.notifications) return;
+    runningTimers.forEach((t) => scheduleHabitTimerEnd(t.at, t.habit.id, t.name));
+  }, [runningTimersKey, settings.notifications, todayKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---- Android back button ---- */
   useEffect(() => {

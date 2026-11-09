@@ -22,6 +22,7 @@ fs.mkdirSync(PKG_DIR, { recursive: true });
 
 // 1) plugin + MainActivity registration
 fs.copyFileSync('android-plugin/ScreenPinPlugin.java', path.join(PKG_DIR, 'ScreenPinPlugin.java'));
+fs.copyFileSync('android-plugin/SoundPlugin.java', path.join(PKG_DIR, 'SoundPlugin.java'));
 fs.writeFileSync(
   path.join(PKG_DIR, 'MainActivity.java'),
   `package com.libr.focusforge;
@@ -33,6 +34,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(ScreenPinPlugin.class);
+        registerPlugin(SoundPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
@@ -63,7 +65,7 @@ fs.writeFileSync(GRADLE, g);
 //    itself keeps its extension). Keep in sync with RINGTONE_NAME in src/native.js.
 if (fs.existsSync(SFX)) {
   fs.mkdirSync(RAW, { recursive: true });
-  for (const f of fs.readdirSync(SFX).filter((f) => f.endsWith('.mp3'))) {
+  for (const f of fs.readdirSync(SFX).filter((f) => f.endsWith('.mp3') || f.endsWith('.wav'))) {
     const ext = path.extname(f);
     const base = path.basename(f, ext).replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
     const resName = base + ext;

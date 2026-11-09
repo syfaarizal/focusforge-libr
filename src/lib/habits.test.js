@@ -6,6 +6,7 @@ import {
   habitStatus, resolveDay, computeStreak, habitStreak,
   canScheduleRest, scheduleRest, scheduleHabitEdit, habitsFor,
   focusMinutesInWindow,
+  autoFinishTimer, timerDueAt, reminderTimes, runningHabitTimers,
 } from './habits.js';
 
 const at = (key, hhmm) => atTime(key, hhmm);
@@ -180,4 +181,126 @@ test('habit edits only take effect tomorrow', () => {
   const versions = scheduleHabitEdit(DEFAULT_HABIT_VERSIONS, edited, now);
   assert.equal(habitsFor(versions, '2026-11-02').find((h) => h.id === 'study').open, '10:00');
   assert.equal(habitsFor(versions, '2026-11-03').find((h) => h.id === 'study').open, '14:00');
+});
+
+/* ------------------------------------------------------------------ */
+/* Auto-finishing timers                                              */
+/* ------------------------------------------------------------------ */
+test('timerDueAt: null when not running, the due moment while running', () => {
+  const k = '2026-11-02';
+  assert.equal(timerDueAt(workout, {}, k), null);
+  const logs = startTimerHabit({}, workout, at(k, '07:00')).logs;
+  assert.equal(timerDueAt(workout, logs, k), at(k, '07:30'));
+  // once done, it is no longer running
+  const done = finishTimerHabit(logs, workout, at(k, '07:30')).logs;
+  assert.equal(timerDueAt(workout, done, k), null);
+});
+
+test('autoFinishTimer: ticks off on its own once the full duration passed', () => {
+  const k = '2026-11-02';
+  const logs = startTimerHabit({}, workout, at(k, '07:00')).logs;
+
+  // not yet due
+  assert.equal(autoFinishTimer(logs, workout, k, at(k, '07:29')).ok, false);
+
+  const r = autoFinishTimer(logs, workout, k, at(k, '07:35'));
+  assert.equal(r.ok, true);
+  // stamped at the moment the timer ran out, not when it was noticed
+  assert.equal(r.logs[k].workout.doneAt, at(k, '07:30'));
+
+  const ctx = baseCtx({ logs: r.logs });
+  assert.equal(habitStatus(workout, k, at(k, '07:35'), ctx), 'done');
+});
+
+test('autoFinishTimer: a timer that would end after the window closes does not count', () => {
+  const k = '2026-11-02';
+  // 07:00 + 30m = 07:30, which is inside the 08:00 window, so this one counts
+  const ok = startTimerHabit({}, workout, at(k, '07:00')).logs;
+  assert.equal(autoFinishTimer(ok, workout, k, at(k, '08:05')).ok, true);
+
+  // a habit whose window closes before the timer ends never auto-completes
+  const short = { ...workout, open: '06:45', close: '07:10', minMinutes: 30 };
+  const started = startTimerHabit({}, short, at(k, '06:50')).logs;
+  assert.equal(autoFinishTimer(started, short, k, at(k, '07:30')).ok, false);
+});
+
+test('autoFinishTimer: doing nothing keeps the habit missed, not done', () => {
+  const k = '2026-11-02';
+  assert.equal(autoFinishTimer({}, workout, k, at(k, '08:05')).ok, false);
+});
+
+test('reminderTimes: only the windows still ahead of us', () => {
+  const k = '2026-11-02';
+  const habits = DEFAULT_HABIT_VERSIONS[0].habits;
+  const early = reminderTimes(habits, k, at(k, '06:00'));
+  assert.equal(early.length, 3);
+  assert.equal(early[0].habit.id, 'workout');
+  assert.equal(early[0].at, at(k, '06:45'));
+
+  const mid = reminderTimes(habits, k, at(k, '08:15'));
+  assert.equal(mid.length, 1);
+  assert.equal(mid[0].habit.id, 'study');
+
+  const late = reminderTimes(habits, k, at(k, '23:00'));
+  assert.equal(late.length, 0);
+});
+
+test('runningHabitTimers: points at the timer that is currently running', () => {
+  const k = '2026-11-02';
+  const versions = DEFAULT_HABIT_VERSIONS;
+  assert.deepEqual(runningHabitTimers({}, versions, k), []);
+
+  const logs = startTimerHabit({}, workout, at(k, '07:00')).logs;
+  const r = runningHabitTimers(logs, versions, k);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].name, 'Workout');
+  assert.equal(r[0].at, at(k, '07:30'));
+});
+
+test('workout auto-timer: starting it runs the full 30 minutes and ticks itself off', () => {
+  const k = '2026-11-02';
+  const logs = startTimerHabit({}, workout, at(k, '06:45')).logs;
+
+  // The timer counts down from the moment it was started.
+  assert.equal(timerDueAt(workout, logs, k), at(k, '07:15'));
+
+  // Halfway through it is still running, not done.
+  const mid = baseCtx({ logs });
+  assert.equal(habitStatus(workout, k, at(k, '07:00'), mid), 'open');
+
+  // Once the 30 minutes are up it is done, without anyone pressing anything.
+  const r = autoFinishTimer(logs, workout, k, at(k, '07:20'));
+  assert.equal(r.ok, true);
+  const done = baseCtx({ logs: r.logs });
+  assert.equal(habitStatus(workout, k, at(k, '07:20'), done), 'done');
+});
+
+test('workout: nothing can be started once the window has closed', () => {
+  const k = '2026-11-02';
+  // 08:00 is the close of the workout window.
+  assert.equal(startTimerHabit({}, workout, at(k, '08:00')).ok, false);
+  assert.equal(startTimerHabit({}, workout, at(k, '08:05')).ok, false);
+
+  // The last moment a 30 minute workout can still be started.
+  assert.equal(startTimerHabit({}, workout, at(k, '07:30')).ok, true);
+});
+
+test('workout: a timer running past the window does not count as done', () => {
+  const k = '2026-11-02';
+  // A window that closes before the timer can run out.
+  const short = { ...workout, open: '06:45', close: '07:10', minMinutes: 30 };
+  const logs = startTimerHabit({}, short, at(k, '06:45')).logs;
+  assert.equal(autoFinishTimer(logs, short, k, at(k, '07:30')).ok, false);
+
+  // The habit is missed, not done.
+  const ctx = baseCtx({ logs });
+  assert.equal(habitStatus(short, k, at(k, '07:30'), ctx), 'missed');
+});
+
+test('workout: an auto-finished timer counts towards the day and the streak', () => {
+  const k = '2026-11-02';
+  const logs = startTimerHabit({}, workout, at(k, '06:45')).logs;
+  const r = autoFinishTimer(logs, workout, k, at(k, '07:20'));
+  const ctx = baseCtx({ logs: r.logs, sessions: [studySession(k)] });
+  assert.equal(resolveDay(k, at(k, '07:20'), ctx), 'complete');
 });

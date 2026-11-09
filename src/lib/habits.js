@@ -147,6 +147,51 @@ export function finishTimerHabit(logs, habit, now) {
   return { ok: true, logs: withEntry(logs, key, habit.id, { doneAt: now }) };
 }
 
+/* ------------------------------------------------------------------ */
+/* Auto-finishing timers                                              */
+/* ------------------------------------------------------------------ */
+// When a running timer is due to finish, or null when it is not running.
+export function timerDueAt(habit, logs, key) {
+  const entry = logs[key]?.[habit.id];
+  if (!entry?.startedAt || entry.doneAt) return null;
+  return entry.startedAt + (habit.minMinutes ?? 0) * 60000;
+}
+
+/**
+ * A timer that has run its full duration inside the window counts as done even
+ * if nobody ever pressed "Finish". The completion is stamped at the moment the
+ * timer ran out, not at the moment it was noticed.
+ */
+export function autoFinishTimer(logs, habit, key, now) {
+  const dueAt = timerDueAt(habit, logs, key);
+  if (dueAt === null) return { ok: false, logs };
+  if (now < dueAt) return { ok: false, logs };
+  const { close } = windowOf(habit, key);
+  if (dueAt > close) return { ok: false, logs, reason: 'Window closed.' };
+  return { ok: true, logs: withEntry(logs, key, habit.id, { doneAt: dueAt }) };
+}
+
+// When each habit window opens, so a reminder can be scheduled for it. Windows
+// that already passed today are left out.
+export function reminderTimes(habits, key, now) {
+  return habits
+    .map((habit) => ({ habit, at: atTime(key, habit.open) }))
+    .filter((r) => r.at > now);
+}
+
+// The timer habits that are currently running, so an alert can be scheduled
+// for the moment they run out.
+export function runningHabitTimers(logs, versions, key) {
+  const running = [];
+  for (const habit of habitsFor(versions, key)) {
+    if (habit.kind !== 'timer') continue;
+    const dueAt = timerDueAt(habit, logs, key);
+    if (dueAt === null) continue;
+    running.push({ habit, at: dueAt, name: habit.name });
+  }
+  return running;
+}
+
 // "Excused" (e.g. the dhuha alternative option). Only for habits flagged
 // excusable, only for today, only before its window closes.
 export function setExcused(logs, habit, now, value = true) {

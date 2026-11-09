@@ -6,9 +6,9 @@ export default function Loading({ onDone }) {
   const [intro, setIntro] = useState(true);
   const [out, setOut] = useState(false);
   useEffect(() => {
-    const introTimer = setTimeout(() => setIntro(false), 900);
-    const fadeTimer = setTimeout(() => setOut(true), 4400);
-    const doneTimer = setTimeout(onDone, 4900);
+    const introTimer = setTimeout(() => setIntro(false), 600);
+    const fadeTimer = setTimeout(() => setOut(true), 2600);
+    const doneTimer = setTimeout(onDone, 3100);
     return () => {
       clearTimeout(introTimer);
       clearTimeout(fadeTimer);

@@ -2,9 +2,10 @@ import { useSyncExternalStore } from 'react';
 import { uid } from './utils';
 import {
   DEFAULT_HABIT_VERSIONS,
+  autoFinishTimer,
   checkInTap,
   dateKey as habitDateKey,
-  finishTimerHabit,
+  habitsFor,
   scheduleHabitEdit,
   scheduleRest,
   setExcused,
@@ -250,15 +251,36 @@ export const actions = {
     if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
     return r;
   },
-  habitFinishTimer: (habit) => {
-    const r = finishTimerHabit(state.habits.logs, habit, Date.now());
-    if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
-    return r;
-  },
   habitSetExcused: (habit, value) => {
     const r = setExcused(state.habits.logs, habit, Date.now(), value);
     if (r.ok) commit({ ...state, habits: { ...state.habits, logs: r.logs } });
     return r;
+  },
+
+  /**
+   * Advances running habit timers and reports which habits just completed.
+   * Called on a timer while the Habits screen is open, so a workout that runs
+   * out is ticked off without anyone pressing "Finish".
+   */
+  habitTick: () => {
+    const now = Date.now();
+    const key = habitDateKey(now);
+    const habits = habitsFor(state.habits.habitVersions, key);
+    let logs = state.habits.logs;
+    const completed = [];
+
+    for (const habit of habits) {
+      if (habit.kind !== 'timer') continue;
+      const r = autoFinishTimer(logs, habit, key, now);
+      if (!r.ok) continue;
+      logs = r.logs;
+      completed.push(habit);
+    }
+
+    if (completed.length) {
+      commit({ ...state, habits: { ...state.habits, logs } });
+    }
+    return completed;
   },
   habitScheduleRest: (targetKey) => {
     const r = scheduleRest(state.habits.restDays, targetKey, Date.now());

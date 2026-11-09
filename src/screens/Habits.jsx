@@ -25,6 +25,7 @@ import {
   habitsFor,
   resolveDay,
   REST_DAYS_PER_MONTH,
+  timerDueAt,
 } from '../lib/habits';
 
 const KIND_ICON = { timer: Dumbbell, tap: Coffee, focus: BookOpen };
@@ -62,9 +63,11 @@ function HabitRow({ habit, dayKey, now, ctx, logs, onError, onFocus }) {
   const focusNeeded = habit.minMinutes ?? 0;
   const focusPct = focusNeeded ? Math.min(1, focusMin / focusNeeded) : 0;
 
-  const elapsed = entry?.startedAt ? Math.max(0, now - entry.startedAt) : 0;
-  const elapsedMin = Math.floor(elapsed / 60000);
-  const canFinish = elapsed >= (habit.minMinutes ?? 0) * 60000 && now <= close;
+  // A running timer counts itself down and ticks off on its own.
+  const dueAt = habit.kind === 'timer' ? timerDueAt(habit, logs, dayKey) : null;
+  const leftMs = dueAt !== null ? Math.max(0, dueAt - now) : 0;
+  const leftSec = Math.ceil(leftMs / 1000);
+  const leftLabel = `${String(Math.floor(leftSec / 60)).padStart(2, '0')}:${String(leftSec % 60).padStart(2, '0')}`;
 
   const run = (fn) => {
     const r = fn();
@@ -98,9 +101,9 @@ function HabitRow({ habit, dayKey, now, ctx, logs, onError, onFocus }) {
           </div>
         )}
 
-        {habit.kind === 'timer' && entry?.startedAt && status !== 'done' && (
+        {habit.kind === 'timer' && dueAt !== null && status !== 'done' && (
           <span className="h-timer">
-            {elapsedMin}/{habit.minMinutes}m elapsed
+            {leftMs > 0 ? `${leftLabel} left` : 'Ticking off…'}
           </span>
         )}
       </div>
@@ -117,16 +120,6 @@ function HabitRow({ habit, dayKey, now, ctx, logs, onError, onFocus }) {
         {status === 'open' && habit.kind === 'timer' && !entry?.startedAt && (
           <button className="btn h-btn primary" onClick={() => run(() => actions.habitStartTimer(habit))}>
             Start
-          </button>
-        )}
-
-        {habit.kind === 'timer' && entry?.startedAt && status !== 'done' && (
-          <button
-            className="btn h-btn primary"
-            disabled={!canFinish}
-            onClick={() => run(() => actions.habitFinishTimer(habit))}
-          >
-            Finish
           </button>
         )}
 

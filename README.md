@@ -23,13 +23,15 @@ Built with React and wrapped as a native app with Capacitor. Everything is store
 - **Tracker and History**: daily, weekly and monthly totals, a ring against a daily goal, category filters, per-item delete with undo, clear all.
 - **Stats**: 7-day, 30-day and custom ranges, a bar chart, comparison with the previous period, session completion rate and time per category.
 - **Export**: full JSON backup and CSV of sessions through the system share sheet.
-- **Notifications**: a local notification when a session ends.
+- **Notifications**: a local notification when a session ends, a reminder when a habit window opens, and an alert when a habit timer runs out.
+- **Habits**: a daily checklist with strict windows (Workout, Dhuha, Belajar / Work) and a streak that breaks on a missed required habit. Starting a timer habit runs a countdown and ticks itself off when the timer runs out; a habit whose window has closed can no longer be started or finished.
 
 ## Engineering notes
 
 - **Timer accuracy**: the timer stores a start timestamp and accumulated pause time instead of counting ticks, so it stays correct when the app is backgrounded or the WebView is paused. A session that ended in the background is finalized the moment the app comes back.
 - **State**: a small external store (`useSyncExternalStore`) persisted to `localStorage`. Statistics are derived from the session list, never stored separately.
-- **Native bridge**: a custom Capacitor plugin (`android-plugin/ScreenPinPlugin.java`) wraps `startLockTask()` and `FLAG_KEEP_SCREEN_ON`. The CI patch script registers it in the generated Android project, so no Android project is committed.
+- **Native bridge**: two custom Capacitor plugins wrap the Android bits the WebView cannot do: `android-plugin/ScreenPinPlugin.java` covers `startLockTask()` and `FLAG_KEEP_SCREEN_ON`, `android-plugin/SoundPlugin.java` plays the end-of-session ringtone through `MediaPlayer` so it still sounds when the app is backgrounded, screen pinned or suspended. The CI patch script registers them in the generated Android project, so no Android project is committed.
+- **Notification channels**: on Android 8+ the sound belongs to the channel, and a channel's sound can never be changed. The app creates its own channels and deletes and recreates any whose sound does not match, so an upgrade cannot leave the app with a silent channel. The alert channel is built by the native sound plugin instead of the notifications plugin, because the notifications plugin always uses `USAGE_NOTIFICATION`, and a notification sound on that usage is silenced whenever the phone is on silent or vibrate. `USAGE_ALARM` keeps the timer alert audible when the phone is face down.
 - **CI**: GitHub Actions builds the web app, generates the Android project, icons and splash, builds a release APK and signs it.
 
 Stack: React 19, Vite, Capacitor 8, Lucide icons, Inter (bundled).
